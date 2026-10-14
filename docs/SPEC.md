@@ -2,7 +2,7 @@
 
 |             |                                     |
 | ----------- | ----------------------------------- |
-| **Version** | 0.4                                 |
+| **Version** | 0.5                                 |
 | **Date**    | 2026-10-14                          |
 | **Status**  | Phase 1 done                        |
 
@@ -128,7 +128,9 @@ win). About 125,000 weights. Inputs are scaled to roughly 0–1 (money ÷ 106).
   (clip 0.2, value weight 0.5, entropy bonus 0.01, Adam 3e-4).
 - Seats around the learner: itself (50%), else earlier generations or the bots.
 - A new **generation** is saved every 20 iterations, with its win rate against the bots.
-- `python -m high_society.train --run <name> --hours <h>`; a stopped run resumes.
+- `python -m high_society.train --run <name> --hours <h>`; a stopped run resumes. The games
+  are played by worker processes on every core; the network learns in the main process.
+- Training runs on the owner's PC (8 cores), the website on the VPS (docs/TRAINING.md).
 
 ### 4.3 Rating
 
@@ -165,3 +167,4 @@ Each phase ends with tests passing in CI.
 | 0.2     | 2026-10-14 | Phase 1: faux pas discards the lowest luxury; nobody is eliminated when everyone is equally poor. |
 | 0.3     | 2026-10-14 | Everyone equally poor: everyone is eliminated, nobody wins. |
 | 0.4     | 2026-10-14 | Phase 2: the network, its actions and layers, PPO settings, ratings. |
+| 0.5     | 2026-10-14 | Training on the owner's PC with parallel workers; `report` command. |

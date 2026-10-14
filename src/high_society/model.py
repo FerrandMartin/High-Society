@@ -7,6 +7,7 @@ me, the card, the game ───────────────────
 
 from __future__ import annotations
 
+import os
 from dataclasses import asdict, dataclass
 
 import torch
@@ -61,7 +62,10 @@ class PolicyValueNet(nn.Module):
         return logits, value
 
     def save(self, path: str, **extra: object) -> None:
-        torch.save({"config": asdict(self.config), "state": self.state_dict(), **extra}, path)
+        """Written to a temporary file first: stopping mid-save never leaves a broken file."""
+        temporary = f"{path}.tmp"
+        torch.save({"config": asdict(self.config), "state": self.state_dict(), **extra}, temporary)
+        os.replace(temporary, path)
 
     @classmethod
     def load(cls, path: str) -> tuple[PolicyValueNet, dict[str, object]]:

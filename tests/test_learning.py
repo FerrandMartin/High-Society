@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 import torch
@@ -18,7 +20,9 @@ from high_society.engine import Game, Pass, Raise
 from high_society.model import ModelConfig, PolicyValueNet
 from high_society.play import NetAgent, Step, batch, play_games, reward, think
 from high_society.rating import fit_ratings, tournament
+from high_society.report import generations_table
 from high_society.train import TrainConfig, advantages, update
+from high_society.workers import Players
 
 
 @pytest.mark.parametrize("players", [3, 4, 5])
@@ -124,3 +128,30 @@ def test_tournament_between_bots() -> None:
     assert sum(s.games for s in standings) >= 300 * 3
     game = play_games([[ValueBot(), SaverBot(), ValueBot()]], seed=9).games[0]
     assert sum(reward(game, i) for i in range(3)) in (0.0, 1.0)
+
+
+def test_worker_processes_play_and_return_the_learners_decisions(tmp_path: Path) -> None:
+    torch.manual_seed(0)
+    model = PolicyValueNet(ModelConfig(width=32, opponent_width=16))
+    past = tmp_path / "gen_0001.pt"
+    model.save(str(past))
+    tables = [["learner", "value", f"gen:{past}"], ["saver", "learner", "random:3", "learner"]] * 3
+    for workers in (1, 2):
+        players = Players(workers)
+        try:
+            steps, rewards = players.play(tables, 10, model)
+        finally:
+            players.close()
+        assert {s.game for s in steps} == set(range(6))
+        assert set(rewards) == {(s.game, s.seat) for s in steps}
+        assert all(tables[s.game][s.seat] == "learner" for s in steps)
+
+
+def test_report_lists_generations(tmp_path: Path) -> None:
+    (tmp_path / "metrics.jsonl").write_text(
+        '{"iteration": 1, "games": 256, "entropy": 1.2}\n'
+        '{"iteration": 2, "games": 512, "generation": 1, "win_3p": 0.4, "win_4p": 0.3,'
+        ' "win_5p": 0.2, "entropy": 1.1}\n'
+    )
+    lines = generations_table(tmp_path)
+    assert len(lines) == 3 and "40%" in lines[1]

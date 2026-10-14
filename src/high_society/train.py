@@ -2,6 +2,8 @@
 
     uv run python -m high_society.train --run main --hours 2
 
+The games are played on all the processor's cores (--workers) and the network learns from
+them in between (--threads).
 Each iteration plays a batch of games (3 to 5 players at random) where the learner sits next
 to copies of itself, earlier generations and the simple bots; then the network is nudged
 towards the moves that turned out better than it expected. A generation is saved regularly in
@@ -12,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
 import time
 from dataclasses import asdict, dataclass
@@ -23,6 +26,7 @@ import torch
 from .bots import RandomBot, SaverBot, ValueBot
 from .model import ModelConfig, PolicyValueNet
 from .play import Agent, NetAgent, Step, batch, play_games, reward
+from .workers import Players
 
 
 @dataclass
@@ -144,6 +148,7 @@ def train(
     seed: int,
     threads: int,
     iterations: int | None = None,
+    workers: int = 1,
 ) -> Path:
     torch.set_num_threads(threads)
     folder = Path("runs") / run
@@ -160,59 +165,88 @@ def train(
         games_played = int(data["games"])  # type: ignore[call-overload]
         print(f"Resuming {run} at iteration {iteration}")
     generations = sorted(folder.glob("gen_*.pt"))
-    pool = [PolicyValueNet.load(str(p))[0] for p in generations[-cfg.pool_size :]]
 
     rng = random.Random(seed + iteration)
-    learner = NetAgent(model, name="learner")
     deadline = time.time() + hours * 3600
     metrics = folder / "metrics.jsonl"
-    while time.time() < deadline and (iterations is None or iteration < iterations):
-        started = time.time()
-        tables: list[list[Agent]] = []
-        for _ in range(cfg.games_per_iteration):
-            n = rng.choice((3, 4, 5))
-            table: list[Agent] = []
-            for _ in range(n - 1):
-                if rng.random() < cfg.self_share:
-                    table.append(learner)
-                elif pool and rng.random() >= cfg.bot_share:
-                    table.append(NetAgent(rng.choice(pool), name="past"))
-                else:
-                    table.append(random_bot(rng))
-            table.insert(rng.randrange(n), learner)
-            tables.append(table)
-        result = play_games(tables, seed=rng.randrange(1 << 30), record=learner)
-        rewards = {(s.game, s.seat): reward(result.games[s.game], s.seat) for s in result.steps}
-        adv, returns = advantages(result.steps, rewards, cfg.gae_lambda)
-        stats = update(model, optimiser, result.steps, adv, returns, cfg)
-        iteration += 1
-        games_played += cfg.games_per_iteration
-        line: dict[str, object] = {
-            "iteration": iteration,
-            "games": games_played,
-            "steps": len(result.steps),
-            "seconds": round(time.time() - started, 2),
-            **stats,
-        }
-        if iteration % cfg.generation_every == 0:
-            number = len(generations) + 1
-            path = folder / f"gen_{number:04d}.pt"
-            model.save(str(path), iteration=iteration, games=games_played)
-            generations.append(path)
-            pool.append(PolicyValueNet.load(str(path))[0])
-            pool = pool[-cfg.pool_size :]
-            line.update(generation=number, **against_bots(model, cfg.eval_games, iteration))
-            print(json.dumps(line))
-        model.save(
-            str(checkpoint),
-            optimiser=optimiser.state_dict(),
-            iteration=iteration,
-            games=games_played,
-            train_config=asdict(cfg),
-        )
-        with metrics.open("a") as f:
-            f.write(json.dumps(line) + "\n")
+    players = Players(workers)
+    try:
+        while time.time() < deadline and (iterations is None or iteration < iterations):
+            iteration, games_played = _iteration(
+                folder,
+                model,
+                optimiser,
+                cfg,
+                rng,
+                players,
+                generations,
+                iteration,
+                games_played,
+                metrics,
+            )
+    finally:
+        players.close()
     return folder
+
+
+def _seat(cfg: TrainConfig, rng: random.Random, generations: list[Path]) -> str:
+    """Who sits next to the learner: itself, an earlier generation or a bot."""
+    if rng.random() < cfg.self_share:
+        return "learner"
+    recent = generations[-cfg.pool_size :]
+    if recent and rng.random() >= cfg.bot_share:
+        return f"gen:{rng.choice(recent)}"
+    return rng.choice([f"random:{rng.randrange(1 << 30)}", "value", "saver"])
+
+
+def _iteration(
+    folder: Path,
+    model: PolicyValueNet,
+    optimiser: torch.optim.Optimizer,
+    cfg: TrainConfig,
+    rng: random.Random,
+    players: Players,
+    generations: list[Path],
+    iteration: int,
+    games_played: int,
+    metrics: Path,
+) -> tuple[int, int]:
+    started = time.time()
+    tables: list[list[str]] = []
+    for _ in range(cfg.games_per_iteration):
+        n = rng.choice((3, 4, 5))
+        table = [_seat(cfg, rng, generations) for _ in range(n - 1)]
+        table.insert(rng.randrange(n), "learner")
+        tables.append(table)
+    steps, rewards = players.play(tables, rng.randrange(1 << 30), model)
+    adv, returns = advantages(steps, rewards, cfg.gae_lambda)
+    stats = update(model, optimiser, steps, adv, returns, cfg)
+    iteration += 1
+    games_played += cfg.games_per_iteration
+    line: dict[str, object] = {
+        "iteration": iteration,
+        "games": games_played,
+        "steps": len(steps),
+        "seconds": round(time.time() - started, 2),
+        **stats,
+    }
+    if iteration % cfg.generation_every == 0:
+        number = len(generations) + 1
+        path = folder / f"gen_{number:04d}.pt"
+        model.save(str(path), iteration=iteration, games=games_played)
+        generations.append(path)
+        line.update(generation=number, **against_bots(model, cfg.eval_games, iteration))
+        print(json.dumps(line), flush=True)
+    model.save(
+        str(folder / "latest.pt"),
+        optimiser=optimiser.state_dict(),
+        iteration=iteration,
+        games=games_played,
+        train_config=asdict(cfg),
+    )
+    with metrics.open("a") as f:
+        f.write(json.dumps(line) + "\n")
+    return iteration, games_played
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -223,7 +257,13 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--hours", type=float, default=1.0)
     parser.add_argument("--iterations", type=int, default=None)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--threads", type=int, default=2)
+    cores = os.cpu_count() or 2
+    parser.add_argument(
+        "--workers", type=int, default=max(1, cores - 1), help="processes playing the games"
+    )
+    parser.add_argument(
+        "--threads", type=int, default=min(cores, 8), help="threads for the learning step"
+    )
     parser.add_argument("--width", type=int, default=256)
     parser.add_argument("--layers", type=int, default=2)
     parser.add_argument("--games-per-iteration", type=int, default=256)
@@ -240,6 +280,7 @@ def main(argv: list[str] | None = None) -> None:
         args.seed,
         args.threads,
         args.iterations,
+        args.workers,
     )
 
 
