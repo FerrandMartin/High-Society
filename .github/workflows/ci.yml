@@ -23,3 +23,18 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy
       - run: uv run pytest -q
+
+  windows:
+    # Training runs on the owner's Windows PC: tests and a short training run with worker
+    # processes (Windows starts them differently from Linux).
+    name: Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run pytest -q
+      - run: uv run python -m high_society.train --run ci --iterations 2 --generation-every 2 --workers 2 --threads 2
+      - run: uv run python -m high_society.report --run ci --tournament 1 --games 150
