@@ -194,7 +194,7 @@ def test_the_poorest_is_eliminated_then_the_best_score_wins() -> None:
     assert game.winners() == [1]
 
 
-def test_ties_eliminate_everyone_tied_but_never_everyone() -> None:
+def test_ties_eliminate_everyone_tied_even_everyone() -> None:
     game = play_game([ValueBot(), ValueBot(), ValueBot()], seed=1)
     game.players[0].hand = [1]
     game.players[1].hand = [1]
@@ -202,7 +202,9 @@ def test_ties_eliminate_everyone_tied_but_never_everyone() -> None:
     assert game.eliminated() == [0, 1]
     for p in game.players:
         p.hand = [3]
-    assert game.eliminated() == []
+    # Everyone equally poor: everyone loses.
+    assert game.eliminated() == [0, 1, 2]
+    assert game.winners() == []
 
 
 @pytest.mark.parametrize("players", [3, 4, 5])
@@ -222,4 +224,5 @@ def test_random_games_keep_the_money_and_always_end(players: int) -> None:
         assert left + spent == STARTING_MONEY * players
         assert sum(c.red for p in game.players for c in p.cards) == 3
         winners = game.winners()
-        assert winners and not set(winners) & set(game.eliminated())
+        assert not set(winners) & set(game.eliminated())
+        assert winners or len(game.eliminated()) == players

@@ -2,7 +2,7 @@
 
 |             |                                     |
 | ----------- | ----------------------------------- |
-| **Version** | 0.2                                 |
+| **Version** | 0.3                                 |
 | **Date**    | 2026-10-14                          |
 | **Status**  | Phase 1 done                        |
 
@@ -59,8 +59,8 @@ not auctioned.
 
 **Winner:**
 
-1. The player(s) with the **least money left in hand** are eliminated (all of them on a tie;
-   nobody if every player has the same money).
+1. The player(s) with the **least money left in hand** are eliminated, all of them on a tie.
+   If every player has the same money, everyone is eliminated and nobody wins.
 2. Among the others, score = (sum of luxury values − 5 for Passé) × 2 per prestige ÷ 2 for
    Scandale. Highest score wins.
 3. Ties: more money left, then the highest single luxury card.
@@ -151,3 +151,4 @@ Each phase ends with tests passing in CI.
 | ------- | ---------- | ------------- |
 | 0.1     | 2026-10-14 | First draft.  |
 | 0.2     | 2026-10-14 | Phase 1: faux pas discards the lowest luxury; nobody is eliminated when everyone is equally poor. |
+| 0.3     | 2026-10-14 | Everyone equally poor: everyone is eliminated, nobody wins. |

@@ -255,10 +255,9 @@ class Game:
     # --- end of the game ---
 
     def eliminated(self) -> list[int]:
-        """The poorest player(s); nobody if everyone is equally poor."""
+        """The poorest player(s): all of them on a tie, so everyone if they all have the same
+        money (then nobody wins)."""
         money = [p.money for p in self.players]
-        if len(set(money)) == 1:
-            return []
         return [i for i, m in enumerate(money) if m == min(money)]
 
     def scores(self) -> list[float]:
@@ -266,7 +265,8 @@ class Game:
 
     def winners(self) -> list[int]:
         """Highest score among those not eliminated; ties broken by money left, then by the
-        highest luxury card. Several winners only on a complete tie."""
+        highest luxury card. Several winners only on a complete tie; none if everyone is
+        eliminated."""
         if not self.over:
             raise ValueError("The game is not over")
         out = set(self.eliminated())
@@ -277,6 +277,8 @@ class Game:
             return (score_of(p.cards), p.money, top)
 
         contenders = [i for i in range(self.n) if i not in out]
+        if not contenders:
+            return []
         best = max(rank(i) for i in contenders)
         return [i for i in contenders if rank(i) == best]
 
