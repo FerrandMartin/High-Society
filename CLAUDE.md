@@ -10,6 +10,8 @@ in sync when a decision changes (bump its version, add a changelog row).
   drive games through `Game.legal_actions()` / `Game.play()`; nothing else re-implements a
   rule.
 - The engine is pure and deterministic for a given seed (and `order`/`starter` in tests).
+- The network sees only public information (`encoding.observe`); its 17 actions map to
+  engine moves through `encoding.options`. Change both together, with their tests.
 - Every rule has a test in `tests/test_engine.py`; random-game tests check invariants (money
   is conserved, games end, winners aren't eliminated).
 
@@ -19,6 +21,8 @@ in sync when a decision changes (bump its version, add a changelog row).
 uv sync
 uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest -q
 uv run python -m high_society.simulate --bots value,saver,random --games 2000
+uv run python -m high_society.train --run main --hours 2
+uv run python -m high_society.evaluate random value saver runs/main/gen_0010.pt
 ```
 
 Run all checks before every push; CI runs the same. Python 3.11+, mypy strict, line length 100.

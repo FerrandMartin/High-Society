@@ -2,7 +2,7 @@
 
 |             |                                     |
 | ----------- | ----------------------------------- |
-| **Version** | 0.3                                 |
+| **Version** | 0.4                                 |
 | **Date**    | 2026-10-14                          |
 | **Status**  | Phase 1 done                        |
 
@@ -107,9 +107,15 @@ They give the networks opponents from the start and a fixed yardstick.
   money bid now, cards won, score, still in the auction; empty slots marked absent;
 - the number of players, the cards still in the deck, the red cards already revealed.
 
-**Actions:** pass, or raise to a target amount from a fixed set of levels; the engine then
-plays the cheapest set of money cards that reaches it. Illegal levels are masked. (Choosing
-any subset of 11 cards directly would be 2,048 actions; this keeps it small.)
+**Actions (17):** pass; the smallest possible raise; or raise the bid to at least 2, 3, 4,
+5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50 or 70. The engine plays the cheapest set of money
+cards that reaches it (then the fewest cards). Impossible actions are masked. (Choosing any
+subset of 11 cards directly would be 2,048 actions; this keeps it small.)
+
+**Layers:** each opponent row goes through the same small network (2 layers of 64, ReLU);
+their maximum and mean are joined to the rest of the inputs; a trunk of 2 layers of 256 (with
+LayerNorm and ReLU) feeds a policy head (17 logits) and a value head (a sigmoid: the chance to
+win). About 125,000 weights. Inputs are scaled to roughly 0–1 (money ÷ 106).
 
 **Output:** a policy (how likely each action is) and a value (estimated chance to win).
 
@@ -117,13 +123,19 @@ any subset of 11 cards directly would be 2,048 actions; this keeps it small.)
 
 - Each game picks 3, 4 or 5 players at random. Seats are filled with the current network,
   **earlier generations** and simple bots, so it doesn't overfit to itself.
-- Reward: +1 for a win, 0 otherwise (shared on ties); shaping kept minimal.
-- A new **generation** is saved at regular intervals.
+- Reward: +1 for a win, 0 otherwise (shared on ties); no shaping.
+- Each iteration: 256 games; advantages with GAE (λ 0.95, no discount); 4 epochs of PPO
+  (clip 0.2, value weight 0.5, entropy bonus 0.01, Adam 3e-4).
+- Seats around the learner: itself (50%), else earlier generations or the bots.
+- A new **generation** is saved every 20 iterations, with its win rate against the bots.
+- `python -m high_society.train --run <name> --hours <h>`; a stopped run resumes.
 
 ### 4.3 Rating
 
-Each generation and bot gets an **Elo-style rating** from evaluation games against the others,
-per player count. The website shows the curve over generations.
+Each generation and bot gets an **Elo-style rating** (Bradley-Terry, the random bot at 1000)
+from a tournament: in each game, each winner beats each other player at the table.
+`python -m high_society.evaluate random value saver runs/<run>/gen_0010.pt`. The website
+shows the curve over generations.
 
 ## 5. Website
 
@@ -152,3 +164,4 @@ Each phase ends with tests passing in CI.
 | 0.1     | 2026-10-14 | First draft.  |
 | 0.2     | 2026-10-14 | Phase 1: faux pas discards the lowest luxury; nobody is eliminated when everyone is equally poor. |
 | 0.3     | 2026-10-14 | Everyone equally poor: everyone is eliminated, nobody wins. |
+| 0.4     | 2026-10-14 | Phase 2: the network, its actions and layers, PPO settings, ratings. |

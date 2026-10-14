@@ -119,19 +119,25 @@ def score_of(cards: Iterable[Card]) -> float:
     return total
 
 
+def payable(hand: Iterable[int]) -> dict[int, tuple[int, ...]]:
+    """Every total the hand can pay exactly, with the fewest cards that make it."""
+    best: dict[int, tuple[int, ...]] = {0: ()}
+    for card in sorted(hand):
+        for total, cards in list(best.items()):  # a snapshot: each card used once
+            new = total + card
+            if new not in best or len(cards) + 1 < len(best[new]):
+                best[new] = (*cards, card)
+    return best
+
+
 def cheapest_cards(hand: Iterable[int], at_least: int) -> tuple[int, ...] | None:
     """The money cards adding up to `at_least` or more at the lowest total (then the fewest
     cards); None when the hand can't reach it. There is no change in this game."""
-    hand = sorted(hand)
     if at_least <= 0:
         return ()
-    best: tuple[int, ...] | None = None
-    for size in range(1, len(hand) + 1):
-        for combo in combinations(hand, size):
-            total = sum(combo)
-            if total >= at_least and (best is None or total < sum(best)):
-                best = combo
-    return best
+    totals = payable(hand)
+    reachable = [t for t in totals if t >= at_least]
+    return tuple(sorted(totals[min(reachable)])) if reachable else None
 
 
 class Game:

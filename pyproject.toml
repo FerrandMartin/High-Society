@@ -3,7 +3,7 @@ name = "high-society"
 version = "0.1.0"
 description = "High Society (Reiner Knizia) against self-taught neural-network AIs"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = ["torch>=2.4", "numpy>=2"]
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.11"]

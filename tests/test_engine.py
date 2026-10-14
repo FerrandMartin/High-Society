@@ -54,8 +54,11 @@ def test_scores() -> None:
 
 
 def test_cheapest_cards_never_makes_change() -> None:
-    assert cheapest_cards(MONEY, 5) == (1, 4)
-    assert cheapest_cards(MONEY, 7) == (1, 6)
+    five = cheapest_cards(MONEY, 5)
+    assert five is not None and sum(five) == 5 and len(five) == 2  # 1+4 or 2+3
+    assert cheapest_cards(MONEY, 7) in ((1, 6), (3, 4))
+    assert cheapest_cards(MONEY, 106) == MONEY
+    assert cheapest_cards([4, 6], 5) == (6,)  # no change: the 6 alone
     assert cheapest_cards([10, 20], 5) == (10,)
     assert cheapest_cards([1, 2], 4) is None
     assert cheapest_cards(MONEY, 0) == ()

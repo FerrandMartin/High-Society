@@ -9,7 +9,9 @@ Tailscale, in French and English.
 ## Status
 
 - **Phase 1 (engine and bots), done:** the rules, simple bots and a simulation command.
-- Phase 2 (training), phase 3 (website), phase 4 (deployment): to do.
+- **Phase 2 (training), done:** the network, self-play training with PPO, generations and
+  ratings.
+- Phase 3 (website), phase 4 (deployment): to do.
 
 ## Development
 
@@ -19,4 +21,6 @@ Requirements: Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 uv sync
 uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest -q
 uv run python -m high_society.simulate --bots value,saver,random --games 2000
+uv run python -m high_society.train --run main --hours 2          # generations in runs/main/
+uv run python -m high_society.evaluate random value saver runs/main/gen_0010.pt
 ```
