@@ -2,9 +2,9 @@
 
 |             |                                     |
 | ----------- | ----------------------------------- |
-| **Version** | 0.1 (draft)                         |
+| **Version** | 0.2                                 |
 | **Date**    | 2026-10-14                          |
-| **Status**  | Planning                            |
+| **Status**  | Phase 1 done                        |
 
 A private website to play Reiner Knizia's **High Society** against neural-network AIs, or to
 watch them play each other. The AIs learn by playing against each other (self-play). The site
@@ -48,7 +48,8 @@ higher than the highest bid) or **pass**. Cards bid stay in front of you until t
 - **Disgrace cards:** the **first player to pass** takes the card and takes their bid back;
   everyone else **discards their bids**. (Players bid to avoid the card.)
 - **Faux pas:** the player discards one luxury card of their choice; with none, they discard
-  the next luxury card they win.
+  the next luxury card they win. The engine always discards the lowest one: it is never worse
+  (for the score or the tie-break), so it isn't a decision.
 - A player who can't raise must pass.
 - The winner of an auction (or the taker of a disgrace card) starts the next one. The first
   auction starts with a random player.
@@ -58,7 +59,8 @@ not auctioned.
 
 **Winner:**
 
-1. The player(s) with the **least money left in hand** are eliminated (all of them on a tie).
+1. The player(s) with the **least money left in hand** are eliminated (all of them on a tie;
+   nobody if every player has the same money).
 2. Among the others, score = (sum of luxury values − 5 for Passé) × 2 per prestige ÷ 2 for
    Scandale. Highest score wins.
 3. Ties: more money left, then the highest single luxury card.
@@ -148,3 +150,4 @@ Each phase ends with tests passing in CI.
 | Version | Date       | Change        |
 | ------- | ---------- | ------------- |
 | 0.1     | 2026-10-14 | First draft.  |
+| 0.2     | 2026-10-14 | Phase 1: faux pas discards the lowest luxury; nobody is eliminated when everyone is equally poor. |
